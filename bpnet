@@ -74,9 +74,30 @@ json_parser.add_argument("-o", "--output", type=str,
 
 fit_parser = subparsers.add_parser("fit", help="Fit a BPNet model.")
 fit_parser.add_argument("-p", "--parameters", type=str, required=True,
-	help="A JSON file containing the parameters for fitting the model.")
+	help="A JSON file containing the parameters for fitting the model."),
+fit_parser.add_argument("-l", "--loci", type=str, default=None,
+	help="Loci file"),
+fit_parser.add_argument("-n", "--negatives", type=str, default=None,
+	help="Negatives file"),
+
 
 #
+fit_arsenal_parser = subparsers.add_parser("fit-arsenal", help="Fit a BPNet model with ARSENAL embeddings.")
+fit_arsenal_parser.add_argument("-p", "--parameters", type=str, required=True,
+	help="A JSON file containing the parameters for fitting the model.")
+fit_arsenal_parser.add_argument("-a", "--arsenal_model", type=str, required=True,
+	help="File with ARSENAL model (should be ENTIRE model)."),
+fit_arsenal_parser.add_argument("-l", "--loci", type=str, default=None,
+	help="Loci file"),
+fit_arsenal_parser.add_argument("-n", "--negatives", type=str, default=None,
+	help="Negatives file"),
+fit_arsenal_parser.add_argument("-s", "--seq_input_size", type=int, default=2114,
+	help="Sequence input size to BPNet model"),
+fit_arsenal_parser.add_argument("-v", "--arsenal_input_size", type=int, default=350,
+	help="Sequence input size to Arsenal model"),
+
+
+
 
 predict_parser = subparsers.add_parser("predict", 
 	help="Make predictions using a trained BPNet model.")
@@ -568,6 +589,12 @@ if args.cmd == "fit":
 	from bpnetlite.bpnet import BPNet
 	
 	parameters = merge_parameters(args.parameters, default_fit_parameters)
+	
+	if args.loci is not None:
+		parameters["loci"] = args.loci
+
+	if args.negatives is not None:
+		parameters["negatives"] = args.negatives
 
 	if parameters['verbose']:
 		print("Training Chroms: ", parameters['training_chroms'])
@@ -685,6 +712,149 @@ if args.cmd == "fit":
 	
 	os.system("bpnet evaluate -p {}".format(fname))
 
+##########
+# FIT ARSENAL
+##########
+
+
+if args.cmd == "fit-arsenal":
+	from bpnetlite.bpnet import BPNet, ArsenalBPNet
+	import os
+	import sys
+	arsenal_dir = os.environ.get("ARSENAL_MODEL_DIR", "")
+	sys.path.append(f"{arsenal_dir}/src/regulatory_lm/")
+	from modeling.model import *
+	
+
+	arsenal_model = torch.load(args.arsenal_model, weights_only=False)
+
+	parameters = merge_parameters(args.parameters, default_fit_parameters)
+
+	if args.loci is not None:
+		parameters["loci"] = args.loci
+
+	if args.negatives is not None:
+		parameters["negatives"] = args.negatives
+
+	if parameters['verbose']:
+		print("Training Chroms: ", parameters['training_chroms'])
+		print("Vaidation Chroms: ", parameters['validation_chroms'])
+	
+		print("\nLoading peaks from: ", parameters['loci'])
+		print("Loading negatives from: ", parameters['negatives'], "\n")
+
+	###
+
+	training_data = PeakGenerator(
+		peaks=parameters['loci'],
+		negatives=parameters['negatives'],
+		sequences=parameters['sequences'],
+		signals=parameters['signals'],
+		controls=parameters['controls'],
+		chroms=parameters['training_chroms'],
+		in_window=parameters['in_window'],
+		out_window=parameters['out_window'],
+		max_jitter=parameters['max_jitter'],
+		negative_ratio=parameters['negative_ratio'],
+		reverse_complement=parameters['reverse_complement'],
+		min_counts=parameters['min_counts'],
+		max_counts=parameters['max_counts'],
+		summits=parameters['summits'],
+		exclusion_lists=parameters['exclusion_lists'],
+		random_state=parameters['random_state'],
+		batch_size=parameters['batch_size'],
+		verbose=parameters['verbose']
+	)
+
+	valid_data = extract_loci(
+		sequences=parameters['sequences'],
+		signals=parameters['signals'],
+		in_signals=parameters['controls'],
+		loci=parameters['loci'],
+		chroms=parameters['validation_chroms'],
+		in_window=parameters['in_window'],
+		out_window=parameters['out_window'],
+		max_jitter=0,
+		exclusion_lists=parameters['exclusion_lists'],
+		ignore=list('QWERYUIOPSDFHJKLZXVBNM'),
+		verbose=parameters['verbose']
+	)
+
+	if parameters['verbose']:
+		print("\nTraining Set Peaks: ", training_data.dataset.peak_sequences.shape[0])
+		print("Training Set Negatives: ", training_data.dataset.negative_sequences.shape[0])
+		print("Validation Set Size: ", valid_data[0].shape[0], "\n")
+
+
+	if parameters['count_loss_weight'] is None:
+		peak_read_count = training_data.dataset.peak_signals.sum(axis=-1)
+		count_loss_weight = peak_read_count.mean(axis=(0, 1)).item()
+		parameters['count_loss_weight'] = count_loss_weight
+
+		if parameters['verbose']:
+			print("Count loss weight set to {:4.4}".format(count_loss_weight))
+			print("Negative Ratio: 1:{:4.4} pos:neg\n".format(
+				parameters['negative_ratio']))
+
+
+	if parameters['controls'] is not None:
+		valid_sequences, valid_signals, valid_controls = valid_data
+		n_control_tracks = len(parameters['controls'])
+	else:
+		valid_sequences, valid_signals = valid_data
+		valid_controls = None
+		n_control_tracks = 0
+
+	trimming = (parameters['in_window'] - parameters['out_window']) // 2
+
+	model = ArsenalBPNet(arsenal_model=arsenal_model, seq_input_size=args.seq_input_size, arsenal_input_size=args.arsenal_input_size,
+		n_filters=parameters['n_filters'], 
+		n_layers=parameters['n_layers'],
+		n_outputs=len(parameters['signals']),
+		n_control_tracks=n_control_tracks,
+		input_dim=parameters['input_dim'],
+		input_type=parameters['input_type'],
+		profile_output_bias=parameters['profile_output_bias'],
+		count_output_bias=parameters['count_output_bias'],
+		count_loss_weight=parameters['count_loss_weight'],
+		trimming=trimming,
+		name=parameters['name'],
+		verbose=parameters['verbose']).to(parameters['device'])
+
+
+	optimizer = torch.optim.Adam(model.parameters(), lr=parameters['lr'])
+	
+	if parameters['scheduler']:
+		scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5,
+			patience=5, threshold=0.0001, min_lr=0.0001)
+	else:
+		scheduler = None
+        
+	model.fit(training_data, optimizer, scheduler,
+		X_valid=valid_sequences, 
+		X_ctl_valid=valid_controls, y_valid=valid_signals, 
+		max_epochs=parameters['max_epochs'],
+		batch_size=parameters['batch_size'],
+		early_stopping=parameters['early_stopping'],
+		dtype=parameters['dtype'],
+		device=parameters['device'])
+	
+	
+	### Evaluate Model
+	
+	evaluate_parameters = parameters.copy()
+	evaluate_parameters['chroms'] = parameters['validation_chroms']
+	evaluate_parameters['max_jitter'] = 0
+	evaluate_parameters['reverse_complement'] = False
+	evaluate_parameters['model'] = parameters['name'] + '.torch'
+	evaluate_parameters['performance_filename'] = (parameters['name'] + 
+		'.performance.tsv')
+	
+	fname = "{}.evaluate.json".format(parameters['name'])
+	with open(fname, "w") as outfile:
+		outfile.write(json.dumps(evaluate_parameters, sort_keys=True, indent=4))
+	
+	os.system("bpnet evaluate -p {}".format(fname))
 
 ##########
 # PREDICT
@@ -692,6 +862,10 @@ if args.cmd == "fit":
 
 
 elif args.cmd == 'predict':
+	import sys
+	sys.path.append("/users/patelas/regulatory_lm/src/regulatory_lm/")
+	from modeling.model import *
+
 	from tangermeme.predict import predict
 	parameters = merge_parameters(args.parameters, default_predict_parameters)
 
@@ -755,6 +929,10 @@ elif args.cmd == 'predict':
 
 elif args.cmd == 'evaluate':
 	from bpnetlite.performance import calculate_performance_measures
+	import sys
+	sys.path.append("/users/patelas/regulatory_lm/src/regulatory_lm/")
+	from modeling.model import *
+
 
 	parameters = merge_parameters(args.parameters, default_evaluate_parameters)
 	measure_names = ['profile_mnll', 'profile_jsd', 'profile_pearson', 
