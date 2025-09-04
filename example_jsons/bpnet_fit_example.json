@@ -20,6 +20,8 @@
 	"scheduler": true,
 	"device": "cuda",
 	"verbose": false,
+	"input_dim": 512,
+	"input_type": "embedding",
 
 	"min_counts": 0,
 	"max_counts": 99999999,
@@ -29,24 +31,24 @@
 	  "chr18", "chr19", "chr20", "chr21", "chr22", "chrX"],
 	"validation_chroms": ["chr8", "chr10"],
 
-	"sequences":"hg38.fa",
+	"sequences":"/mnt/lab_data2/regulatory_lm/oak_backup/GRCh38_no_alt_analysis_set_GCA_000001405.15.fasta",
 	
 	"loci":[
-		"peaks.bed.gz"
-	]
+		"/oak/stanford/groups/akundaje/vir/tfatlas/processed_data/ENCSR000AHD/peaks_inliers.bed.gz"
+	],
 	"negatives":[
-		"negatives.bed.gz
+		"/oak/stanford/groups/akundaje/vir/tfatlas/processed_data/ENCSR000AHD/gc_neg_only.bed.gz"
 	],
 	"exclusion_lists":[
-		"hg38.blacklist.bed.gz"
+		"/oak/stanford/groups/akundaje/patelas/reference/hg38/hg38.blacklist.bed"
 	],
 	"signals":[
-	  "input.plus.bigWig", 
-	  "input.minus.bigWig"
+	  "/oak/stanford/groups/akundaje/vir/tfatlas/processed_data/ENCSR000AHD/ENCSR000AHD_plus.bigWig", 
+	  "/oak/stanford/groups/akundaje/vir/tfatlas/processed_data/ENCSR000AHD/ENCSR000AHD_minus.bigWig"
 	],
 	"controls":[
-	  "control.plus.bigWig", 
-	  "control.minus.bigWig"
+	  "/oak/stanford/groups/akundaje/vir/tfatlas/processed_data/ENCSR000AHD/ENCSR000AHD_control_plus.bigWig", 
+	  "/oak/stanford/groups/akundaje/vir/tfatlas/processed_data/ENCSR000AHD/ENCSR000AHD_control_minus.bigWig"
 	],
 	
 	"random_state": 0
