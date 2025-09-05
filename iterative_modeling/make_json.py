@@ -23,8 +23,8 @@ def main():
         elif isinstance(obj, list):
             return [replace_id(v) for v in obj]
         elif isinstance(obj, str):
-            # Replace any ENCSR ID in the string
-            return re.sub(r"ENCSR\w+", encsr_id, obj)
+            # Replace only the 11-character ENCID (ENCSR followed by 6 alphanumeric characters)
+            return re.sub(r"ENCSR\w{6}", encsr_id, obj)
         else:
             return obj
 
