@@ -95,6 +95,9 @@ fit_arsenal_parser.add_argument("-s", "--seq_input_size", type=int, default=2114
 	help="Sequence input size to BPNet model"),
 fit_arsenal_parser.add_argument("-v", "--arsenal_input_size", type=int, default=350,
 	help="Sequence input size to Arsenal model"),
+fit_arsenal_parser.add_argument("--finetune", action="store_true", default=False,
+	help="Whether to finetune ARSENAL model"),
+
 
 
 
@@ -819,6 +822,7 @@ if args.cmd == "fit-arsenal":
 		count_loss_weight=parameters['count_loss_weight'],
 		trimming=trimming,
 		name=parameters['name'],
+		finetune=parameters['finetune'],
 		verbose=parameters['verbose']).to(parameters['device'])
 
 
@@ -863,7 +867,8 @@ if args.cmd == "fit-arsenal":
 
 elif args.cmd == 'predict':
 	import sys
-	sys.path.append("/users/patelas/regulatory_lm/src/regulatory_lm/")
+	arsenal_dir = os.environ.get("ARSENAL_MODEL_DIR", "")
+	sys.path.append(f"{arsenal_dir}/src/regulatory_lm/")
 	from modeling.model import *
 
 	from tangermeme.predict import predict

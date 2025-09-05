@@ -12,10 +12,10 @@ export ARSENAL_MODEL_DIR="/oak/stanford/groups/akundaje/patelas/regulatory_lm/"
 
 sbatch --export=ALL --requeue \
     -J $ENCID \
-    -p akundaje,gpu,owners -t 12:00:00 \
+    -p akundaje,gpu,owners -t 24:00:00 \
     -G 1 -C "GPU_MEM:80GB|GPU_SKU:A100_PCIE|GPU_SKU:A100_SXM4|GPU_SKU:L40S|GPU_SKU:V100_PCIE|GPU_SKU:V100S_PCIE|GPU_SKU:V100_SXM2" \
     --mem=60G \
-    -o $OUTPUT_DIR/.log.o \
+    -o $OUTPUT_DIR/log.o \
     -e $OUTPUT_DIR/log.e \
     run_modeling_pipeline.sh $ENCID $MODEL_PATH $SIZE_LIST $TEMPLATE_JSON $LOCI_FILE $NEGATIVES_FILE $OUTPUT_DIR
 
