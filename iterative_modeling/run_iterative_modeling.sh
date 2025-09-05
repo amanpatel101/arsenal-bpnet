@@ -26,22 +26,29 @@ sample_file() {
     fi
 }
 
-# Create a subdirectory for the original files
-ORIGINAL_DIR="$OUTPUT_DIR/original"
-mkdir -p "$ORIGINAL_DIR"
 
-# Copy and unzip the original loci file to the original directory
+# Create subdirectories for the original arsenal and bpnet models
+ORIGINAL_ARSENAL_DIR="$OUTPUT_DIR/original_arsenal"
+ORIGINAL_BPNET_DIR="$OUTPUT_DIR/original_bpnet"
+mkdir -p "$ORIGINAL_ARSENAL_DIR"
+mkdir -p "$ORIGINAL_BPNET_DIR"
+
+# Copy and unzip the original loci file to both directories
 if [[ "$LOCI_FILE" == *.gz ]]; then
-    zcat "$LOCI_FILE" > "$ORIGINAL_DIR/loci.txt"
+    zcat "$LOCI_FILE" > "$ORIGINAL_ARSENAL_DIR/loci.txt"
+    zcat "$LOCI_FILE" > "$ORIGINAL_BPNET_DIR/loci.txt"
 else
-    cp "$LOCI_FILE" "$ORIGINAL_DIR/loci.txt"
+    cp "$LOCI_FILE" "$ORIGINAL_ARSENAL_DIR/loci.txt"
+    cp "$LOCI_FILE" "$ORIGINAL_BPNET_DIR/loci.txt"
 fi
 
-# Copy and unzip the original negatives file to the original directory
+# Copy and unzip the original negatives file to both directories
 if [[ "$NEGATIVES_FILE" == *.gz ]]; then
-    zcat "$NEGATIVES_FILE" > "$ORIGINAL_DIR/negatives.txt"
+    zcat "$NEGATIVES_FILE" > "$ORIGINAL_ARSENAL_DIR/negatives.txt"
+    zcat "$NEGATIVES_FILE" > "$ORIGINAL_BPNET_DIR/negatives.txt"
 else
-    cp "$NEGATIVES_FILE" "$ORIGINAL_DIR/negatives.txt"
+    cp "$NEGATIVES_FILE" "$ORIGINAL_ARSENAL_DIR/negatives.txt"
+    cp "$NEGATIVES_FILE" "$ORIGINAL_BPNET_DIR/negatives.txt"
 fi
 
 # Count the total number of lines in the original loci file
@@ -51,13 +58,14 @@ else
     TOTAL_LOCI_LINES=$(wc -l < "$LOCI_FILE")
 fi
 
-# Run bpnet fit-arsenal for the original files from the original directory
+# Run bpnet fit-arsenal for the original files from the arsenal directory
 echo "Running bpnet fit-arsenal for the original files..."
-cd "$ORIGINAL_DIR"
+cd "$ORIGINAL_ARSENAL_DIR"
 bpnet fit-arsenal -p "$CONFIG_JSON" -a "$MODEL_PATH" -l "loci.txt" -n "negatives.txt"
 
-# Train a bpnet model on the original data
+# Train a bpnet model on the original data in the bpnet directory
 echo "Training bpnet model on the original data..."
+cd "$ORIGINAL_BPNET_DIR"
 bpnet fit -p "$CONFIG_JSON" -l "loci.txt" -n "negatives.txt"
 
 # Process each size in the size list
