@@ -644,6 +644,7 @@ class ArsenalBPNet(BPNet):
 		self.arsenal_input_size = arsenal_input_size
 		self.softmax = torch.nn.Softmax(dim=-1)
 		self.input_type = input_type
+		self.finetune = finetune
 
 	def one_hot_to_tokens(self, X):
 		tokens = torch.argmax(X, dim=-1)
@@ -778,7 +779,8 @@ class ArsenalBPNet(BPNet):
 				# Clear the optimizer and set the model to training mode
 				optimizer.zero_grad()
 				self.train()
-				self.arsenal_model.eval()
+				if not self.finetune:
+					self.arsenal_model.eval()
 
 				# Make one training step
 				with torch.autocast(device_type=device, dtype=dtype):
