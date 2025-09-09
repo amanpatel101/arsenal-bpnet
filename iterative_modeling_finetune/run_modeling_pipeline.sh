@@ -10,7 +10,7 @@ OUTPUT_DIR=$7
 
 ml python/3.9.0
 source /oak/stanford/groups/akundaje/patelas/sherlock_venv/arsenal-bpnet/bin/activate
-export ARSENAL_MODEL_DIR="/oak/stanford/groups/akundaje/arpitas/regulatory_lm/"
+export ARSENAL_MODEL_DIR="/oak/stanford/groups/akundaje/patelas/regulatory_lm/"
 
 mkdir $OUTPUT_DIR
 
