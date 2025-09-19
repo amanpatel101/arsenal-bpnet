@@ -653,8 +653,23 @@ class ArsenalBPNet(BPNet):
 		return tokens
 
 	def get_likelihoods(self, tokens):
-		logits = self.arsenal_model(tokens, None)
-		probs = self.softmax(logits)
+		if self.seq_input_size == self.arsenal_input_size:
+			logits = self.arsenal_model(tokens, None)
+			probs = self.softmax(logits)
+		else:
+			full_partitions, remainder = self.seq_input_size // self.arsenal_input_size, self.seq_input_size % self.arsenal_input_size
+			for part in range(full_partitions):
+				curr_tokens = tokens[:,part * self.arsenal_input_size : part * self.arsenal_input_size + self.arsenal_input_size]
+				if part == 0:
+					logits = self.arsenal_model(curr_tokens, None)
+				else:
+					curr_logits = self.arsenal_model(curr_tokens, None)
+					logits = torch.cat((logits, curr_logits), dim=1)
+			#To account for the stragglers, we predict the very end of the sequence but only concatenate the stragglers
+			final_pred = self.arsenal_model(tokens[:,-1*self.arsenal_input_size:], None)
+			logits = torch.cat((logits, final_pred[:,-1*remainder:]), dim=1)
+			probs = self.softmax(logits)
+
 		return probs
 
 	def get_embeddings(self, tokens):
