@@ -78,7 +78,7 @@ fit_parser.add_argument("-p", "--parameters", type=str, required=True,
 fit_parser.add_argument("-l", "--loci", type=str, default=None,
 	help="Loci file"),
 fit_parser.add_argument("-n", "--negatives", type=str, default=None,
-	help="Negatives file"),
+	help="Negatives file")
 
 
 #
@@ -88,15 +88,15 @@ fit_arsenal_parser.add_argument("-p", "--parameters", type=str, required=True,
 fit_arsenal_parser.add_argument("-a", "--arsenal_model", type=str, required=True,
 	help="File with ARSENAL model (should be ENTIRE model)."),
 fit_arsenal_parser.add_argument("-l", "--loci", type=str, default=None,
-	help="Loci file"),
+	help="Loci file")
 fit_arsenal_parser.add_argument("-n", "--negatives", type=str, default=None,
-	help="Negatives file"),
+	help="Negatives file")
 fit_arsenal_parser.add_argument("-s", "--seq_input_size", type=int, default=2114,
-	help="Sequence input size to BPNet model"),
+	help="Sequence input size to BPNet model")
 fit_arsenal_parser.add_argument("-v", "--arsenal_input_size", type=int, default=350,
-	help="Sequence input size to Arsenal model"),
+	help="Sequence input size to Arsenal model")
 fit_arsenal_parser.add_argument("--finetune", action="store_true", default=False,
-	help="Whether to finetune ARSENAL model"),
+	help="Whether to finetune ARSENAL model")
 
 
 
@@ -681,7 +681,7 @@ if args.cmd == "fit":
 		name=parameters['name'],
 		verbose=parameters['verbose']).to(parameters['device'])
 
-	optimizer = torch.optim.Adam(model.parameters(), lr=parameters['lr'])
+	optimizer = torch.optim.Adam(model.parameters(), lr=parameters['lr_bpnet'])
 	
 	if parameters['scheduler']:
 		scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5,
@@ -732,6 +732,8 @@ if args.cmd == "fit-arsenal":
 	arsenal_model = torch.load(args.arsenal_model, weights_only=False)
 
 	parameters = merge_parameters(args.parameters, default_fit_parameters)
+
+	parameters["finetune"] = args.finetune
 
 	if args.loci is not None:
 		parameters["loci"] = args.loci
@@ -826,7 +828,7 @@ if args.cmd == "fit-arsenal":
 		verbose=parameters['verbose']).to(parameters['device'])
 
 
-	optimizer = torch.optim.Adam(model.parameters(), lr=parameters['lr'])
+	optimizer = torch.optim.Adam(model.parameters(), lr=parameters['lr_arsenal'])
 	
 	if parameters['scheduler']:
 		scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5,
@@ -859,6 +861,9 @@ if args.cmd == "fit-arsenal":
 		outfile.write(json.dumps(evaluate_parameters, sort_keys=True, indent=4))
 	
 	os.system("bpnet evaluate -p {}".format(fname))
+
+	del model
+	torch.cuda.empty_cache()
 
 ##########
 # PREDICT
@@ -926,6 +931,9 @@ elif args.cmd == 'predict':
 	numpy.savez_compressed(parameters['counts_filename'], y_counts)
 	numpy.savez_compressed(parameters['idx_filename'], idxs)
 
+	del model
+	torch.cuda.empty_cache()
+
 
 ##########
 # EVALUATE
@@ -934,8 +942,8 @@ elif args.cmd == 'predict':
 
 elif args.cmd == 'evaluate':
 	from bpnetlite.performance import calculate_performance_measures
-	import sys
-	sys.path.append("/users/patelas/regulatory_lm/src/regulatory_lm/")
+	arsenal_dir = os.environ.get("ARSENAL_MODEL_DIR", "")
+	sys.path.append(f"{arsenal_dir}/src/regulatory_lm/")
 	from modeling.model import *
 
 
@@ -985,6 +993,9 @@ elif args.cmd == 'evaluate':
 		outfile.write("\n")
 		outfile.write("\t".join([str(measures[name].mean().item()) 
 			for name in measure_names]))
+
+	del model
+	torch.cuda.empty_cache()
 
 
 ##########
